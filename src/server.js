@@ -317,8 +317,10 @@ api.post('/whip', requireStream, express.text({ type: 'application/sdp', limit: 
   }
 
   let answer = body;
-  const ips = [...config.webrtcExtraHosts];
-  if (config.webrtcAutoCandidate) ips.push(...(await resolveHostIPs(req.hostname)));
+  // Browsers ignore hostname candidates, so everything is resolved to IPs.
+  const hosts = [...config.webrtcExtraHosts];
+  if (config.webrtcAutoCandidate) hosts.push(req.hostname);
+  const ips = (await Promise.all(hosts.map(resolveHostIPs))).flat();
   answer = injectCandidates(answer, [...new Set(ips)], config.webrtcPort);
 
   const id = crypto.randomBytes(16).toString('hex');

@@ -142,7 +142,7 @@ Environment variables for the `app` service:
 | `RTSP_PUBLIC_HOST` | *(the host you browse with)* | Hostname or IP shown in the RTSP URLs on the admin page. |
 | `RTSP_PUBLIC_PORT` | `8554` | RTSP port shown in the RTSP URLs. |
 | `WEBRTC_PUBLIC_PORT` | `8189` | Public port of MediaMTX's WebRTC listener. It must match the port mapping of the `mediamtx` service. |
-| `WEBRTC_ADDITIONAL_HOSTS` | *(empty)* | Comma-separated extra IPs or hostnames to advertise as WebRTC candidates, for example your LAN IP when you open the site through a domain that resolves to a different address. |
+| `WEBRTC_ADDITIONAL_HOSTS` | *(empty)* | Comma-separated extra IPs or hostnames (hostnames are looked up on each connection) to advertise as WebRTC candidates. Examples: your LAN IP when you open the site through a domain, or a DDNS name. |
 | `WEBRTC_AUTO_CANDIDATE` | `true` | Advertise the address used to open the site as a WebRTC candidate. |
 | `MEDIAMTX_API_URL` | `http://mediamtx:9997` | Internal URL of the MediaMTX API. |
 | `MEDIAMTX_WEBRTC_URL` | `http://mediamtx:8889` | Internal URL of the MediaMTX WebRTC/WHIP server. |
@@ -162,11 +162,76 @@ For the `mediamtx` service, you can use any [MediaMTX setting](https://github.co
       TLS_KEY_FILE: /certs/privkey.pem
 ```
 
-### Behind a reverse proxy (Caddy, Traefik, Nginx Proxy Manager…)
+### Behind Nginx Proxy Manager (or another reverse proxy)
 
-Point the proxy at `http://<server>:8080` and set `TRUST_PROXY: "true"` (and optionally `HTTPS_ENABLED: "false"`).
+The proxy only handles the **web UI**. The camera video (WebRTC) goes directly from the browser to port **8189 UDP/TCP**. RTSP goes directly to port **8554**, because RTSP isn't HTTP.
 
-The WebRTC media doesn't go through the proxy. Browsers send it directly to port **8189 UDP/TCP**, so the cameras must be able to reach that port. If your domain resolves to an address the cameras can't reach on port 8189, add a reachable address with `WEBRTC_ADDITIONAL_HOSTS`.
+**1. Compose file.** Turn off the app's own HTTPS and trust the proxy's forwarded headers. If Nginx Proxy Manager runs in Docker on the same host, attach the app to its network so port 8080 doesn't have to be published:
+
+```yaml
+services:
+  app:
+    image: ghcr.io/revocx35/web-ip-cam:latest
+    restart: unless-stopped
+    depends_on:
+      - mediamtx
+    volumes:
+      - ./data:/data
+    environment:
+      HTTPS_ENABLED: "false"
+      TRUST_PROXY: "true"
+      RTSP_PUBLIC_HOST: "192.168.1.10"          # server LAN IP, shown in the RTSP URLs
+      WEBRTC_ADDITIONAL_HOSTS: "192.168.1.10"   # lets cameras on the LAN connect directly
+    networks:
+      - default
+      - npm
+
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    restart: unless-stopped
+    ports:
+      - "8554:8554"
+      - "8000:8000/udp"
+      - "8001:8001/udp"
+      - "8189:8189/udp"
+      - "8189:8189/tcp"
+    environment:
+      MTX_AUTHMETHOD: http
+      MTX_AUTHHTTPADDRESS: http://app:9000/mediamtx/auth
+      MTX_API: "yes"
+      MTX_WEBRTCLOCALUDPADDRESS: ":8189"
+      MTX_WEBRTCLOCALTCPADDRESS: ":8189"
+      MTX_RTMP: "no"
+      MTX_HLS: "no"
+      MTX_SRT: "no"
+
+networks:
+  npm:
+    external: true
+    name: nginxproxymanager_default   # check the real name with: docker network ls
+```
+
+If Nginx Proxy Manager runs on another machine (or you don't want to share a network), leave out the `networks:` parts and publish `"8080:8080"` on `app` instead.
+
+**2. Proxy host in Nginx Proxy Manager.** Go to *Hosts → Proxy Hosts → Add Proxy Host*:
+
+| Field | Value |
+|---|---|
+| Domain Names | `cam.example.com` |
+| Scheme | `http` |
+| Forward Hostname / IP | `app` (shared network), or the server's IP |
+| Forward Port | `8080` |
+| Block Common Exploits | on |
+| Websockets Support | not needed |
+| SSL tab | Request a Let's Encrypt certificate, turn on **Force SSL** and **HTTP/2** |
+
+You don't need any custom Nginx config.
+
+**3. Make port 8189 reachable.**
+- **Cameras on your LAN:** set `WEBRTC_ADDITIONAL_HOSTS` to the server's LAN IP (as above). Then LAN cameras connect directly, even though the domain resolves to your public IP.
+- **Cameras outside your LAN (for example a phone on 4G):** forward **8189 UDP and TCP** on your router to the server. The app automatically advertises the IP your domain resolves to. If that isn't your real public IP (for example with the Cloudflare proxy / orange cloud), add your public IP or a DDNS hostname to `WEBRTC_ADDITIONAL_HOSTS`, separated by commas: `"192.168.1.10,myhome.duckdns.org"`.
+
+**4. RTSP.** NVRs on the LAN use `rtsp://…@<server LAN IP>:8554/<name>` directly. Only forward 8554 on your router if you need RTSP from outside, and prefer a VPN for that.
 
 ### Ports
 
