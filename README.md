@@ -143,6 +143,7 @@ Environment variables for the `app` service:
 | `RTSP_PUBLIC_PORT` | `8554` | RTSP port shown in the RTSP URLs. |
 | `WEBRTC_PUBLIC_PORT` | `8189` | Public port of MediaMTX's WebRTC listener. It must match the port mapping of the `mediamtx` service. |
 | `WEBRTC_ADDITIONAL_HOSTS` | *(empty)* | Comma-separated extra IPs or hostnames (hostnames are looked up on each connection) to advertise as WebRTC candidates. Examples: your LAN IP when you open the site through a domain, or a DDNS name. |
+| `ALLOW_EMBED_FROM` | *(empty)* | Comma-separated origins allowed to show the app in an iframe, for example `https://ha.example.com` for a Home Assistant Webpage card. If empty, embedding is blocked. |
 | `WEBRTC_AUTO_CANDIDATE` | `true` | Advertise the address used to open the site as a WebRTC candidate. |
 | `MEDIAMTX_API_URL` | `http://mediamtx:9997` | Internal URL of the MediaMTX API. |
 | `MEDIAMTX_WEBRTC_URL` | `http://mediamtx:8889` | Internal URL of the MediaMTX WebRTC/WHIP server. |
@@ -232,6 +233,29 @@ You don't need any custom Nginx config.
 - **Cameras outside your LAN (for example a phone on 4G):** forward **8189 UDP and TCP** on your router to the server. The app automatically advertises the IP your domain resolves to. If that isn't your real public IP (for example with the Cloudflare proxy / orange cloud), add your public IP or a DDNS hostname to `WEBRTC_ADDITIONAL_HOSTS`, separated by commas: `"192.168.1.10,myhome.duckdns.org"`.
 
 **4. RTSP.** NVRs on the LAN use `rtsp://…@<server LAN IP>:8554/<name>` directly. Only forward 8554 on your router if you need RTSP from outside, and prefer a VPN for that.
+
+### Home Assistant dashboard (wall tablet / kiosk)
+
+A tablet running a Home Assistant dashboard can be a camera too. Embed the camera page in a **Webpage card**:
+
+1. On the `app` service, allow your Home Assistant origin (the address you open Home Assistant with, without a path):
+   ```yaml
+       environment:
+         ALLOW_EMBED_FROM: "https://ha.yourdomain.com"
+   ```
+2. Add a Webpage card (YAML mode):
+   ```yaml
+   type: iframe
+   url: https://cam.yourdomain.com/camera?embed=1
+   allow: camera; microphone; fullscreen
+   aspect_ratio: 16:9
+   ```
+   `?embed=1` shows just the video with a status badge. Log in to the stream once inside the card.
+
+Requirements and limitations:
+- **Home Assistant must be opened over HTTPS.** Browsers block the camera inside an iframe unless the page around it is also HTTPS.
+- **Keep Home Assistant and the camera app on the same domain** (for example `ha.yourdomain.com` and `cam.yourdomain.com`). Safari blocks cookies in iframes from other sites, so the login wouldn't stick.
+- The camera only runs **while the card is on screen**. Switching to another dashboard view, or the screen turning off, stops it; it reconnects automatically when the card is shown again. For a continuous stream, put the card on the view the kiosk normally shows.
 
 ### Ports
 

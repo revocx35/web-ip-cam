@@ -34,6 +34,8 @@ const config = {
   rtspPort: parseInt(env.RTSP_PUBLIC_PORT || '8554', 10),
   webrtcPort: parseInt(env.WEBRTC_PUBLIC_PORT || '8189', 10),
   webrtcAutoCandidate: bool(env.WEBRTC_AUTO_CANDIDATE, true),
+  // Origins allowed to show the app in an iframe (e.g. a Home Assistant dashboard)
+  embedOrigins: (env.ALLOW_EMBED_FROM || '').split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean),
   webrtcExtraHosts: (env.WEBRTC_ADDITIONAL_HOSTS || '').split(',').map((s) => s.trim()).filter(Boolean),
 };
 
@@ -46,6 +48,10 @@ const ADMIN_TTL = 7 * 24 * 3600 * 1000;
 const STREAM_TTL = 365 * 24 * 3600 * 1000;
 const STREAM_NAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const VIEWS = path.join(__dirname, '..', 'views');
+
+for (const o of config.embedOrigins) {
+  if (!/^https?:\/\/[^\s/;,']+$/.test(o)) throw new Error(`ALLOW_EMBED_FROM: "${o}" is not an origin like https://ha.example.com`);
+}
 
 // ---------------------------------------------------------------------------
 // Sessions
@@ -63,13 +69,20 @@ function parseCookies(header) {
 
 function setSession(req, res, payload, ttl) {
   const token = sec.signToken({ ...payload, exp: Date.now() + ttl }, store.secret);
-  const flags = [`${COOKIE}=${token}`, 'Path=/', 'HttpOnly', 'SameSite=Strict', `Max-Age=${Math.floor(ttl / 1000)}`];
+  const flags = [`${COOKIE}=${token}`, 'Path=/', 'HttpOnly', `SameSite=${sameSite(req)}`, `Max-Age=${Math.floor(ttl / 1000)}`];
   if (req.secure) flags.push('Secure');
   res.append('Set-Cookie', flags.join('; '));
 }
 
-function clearSession(res) {
-  res.append('Set-Cookie', `${COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`);
+function clearSession(req, res) {
+  res.append('Set-Cookie', `${COOKIE}=; Path=/; HttpOnly; SameSite=${sameSite(req)}${req.secure ? '; Secure' : ''}; Max-Age=0`);
+}
+
+// When embedding is enabled the cookie must also be sent inside the iframe.
+// SameSite=None requires Secure, so plain-HTTP requests fall back to Lax.
+function sameSite(req) {
+  if (!config.embedOrigins.length) return 'Strict';
+  return req.secure ? 'None' : 'Lax';
 }
 
 // Returns { type: 'admin' } | { type: 'stream', name } | null
@@ -111,15 +124,17 @@ if (config.trustProxy) {
   app.set('trust proxy', /^\d+$/.test(tp) ? parseInt(tp, 10) : bool(tp, false) || tp);
 }
 
+const frameAncestors = config.embedOrigins.length ? `'self' ${config.embedOrigins.join(' ')}` : "'none'";
+
 app.use((req, res, next) => {
   res.set({
     'Content-Security-Policy':
-      "default-src 'self'; img-src 'self' data:; media-src 'self' blob: mediastream:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+      `default-src 'self'; img-src 'self' data:; media-src 'self' blob: mediastream:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors ${frameAncestors}; base-uri 'none'; form-action 'self'`,
     'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'DENY',
     'Referrer-Policy': 'no-referrer',
     'Permissions-Policy': 'camera=(self), microphone=(self), screen-wake-lock=(self)',
   });
+  if (!config.embedOrigins.length) res.set('X-Frame-Options', 'DENY');
   next();
 });
 
@@ -144,7 +159,8 @@ app.get('/admin', (req, res, next) => {
 });
 app.get('/camera', (req, res, next) => {
   const s = getSession(req);
-  return s && s.type === 'stream' ? page('camera')(req, res, next) : res.redirect('/login');
+  if (s && s.type === 'stream') return page('camera')(req, res, next);
+  res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
 });
 
 const api = express.Router();
@@ -208,7 +224,7 @@ api.post('/login/stream', (req, res) => {
 });
 
 api.post('/logout', (req, res) => {
-  clearSession(res);
+  clearSession(req, res);
   res.json({ ok: true });
 });
 

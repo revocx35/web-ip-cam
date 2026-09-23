@@ -8,6 +8,9 @@
   var toggleBtn = $('#btn-toggle');
 
   var SETTINGS_KEY = 'wic-camera-settings';
+  // ?embed=1: compact view for iframes (e.g. a Home Assistant Webpage card)
+  var embedded = new URLSearchParams(location.search).get('embed') === '1';
+  if (embedded) document.body.classList.add('embed');
   var settings = loadSettings();
 
   var wanted = false;       // user wants to be streaming
@@ -61,6 +64,8 @@
     connBadge.textContent = text;
     toggleBtn.textContent = wanted ? 'Stop streaming' : 'Start streaming';
     toggleBtn.className = wanted ? 'danger' : '';
+    // In embedded mode only show the button when the camera is not running.
+    if (embedded) toggleBtn.classList.toggle('hidden', wanted);
   }
 
   function pollStatus() {
@@ -74,7 +79,7 @@
         viewerBadge.classList.add('hidden');
       }
     }).catch(function (err) {
-      if (err.status === 401) location.href = '/login';
+      if (err.status === 401) location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search);
     });
   }
 
@@ -224,7 +229,7 @@
         });
       })
       .then(function (res) {
-        if (res.status === 401) { location.href = '/login'; throw new Error('Session expired'); }
+        if (res.status === 401) { location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search); throw new Error('Session expired'); }
         return res.text().then(function (text) {
           if (res.status !== 201) {
             var m = 'Server error ' + res.status;

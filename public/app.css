@@ -154,3 +154,11 @@ button.block { width: 100%; margin-top: 18px; }
 .dialog { width: 100%; max-width: 420px; }
 .mt, p.sub.mt { margin-top: 12px; }
 .mirror { transform: scaleX(-1); }
+
+/* Embedded (iframe) camera view: just the video */
+body.embed { background: #000; }
+.embed .wrap { max-width: none; padding: 0; }
+.embed header.top, .embed .card, .embed #btn-switch, .embed #btn-blackout { display: none; }
+.embed .video-box { border: 0; border-radius: 0; }
+.embed .buttons { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); margin: 0; }
+.embed .msg { position: fixed; left: 8px; right: 8px; bottom: 60px; margin: 0; z-index: 5; }

@@ -29,9 +29,14 @@
       });
   }
 
+  // Return to e.g. /camera?embed=1 after logging in from an embedded card.
+  var next = new URLSearchParams(location.search).get('next') || '';
+  var cameraNext = /^\/camera(\?|$)/.test(next) ? next : '/camera';
+  if (cameraNext !== '/camera') select('stream');
+
   $('#stream-form').addEventListener('submit', function (e) {
     e.preventDefault();
-    submit(e.target, '/api/login/stream', { name: $('#stream-name').value.trim(), password: $('#stream-password').value }, '/camera');
+    submit(e.target, '/api/login/stream', { name: $('#stream-name').value.trim(), password: $('#stream-password').value }, cameraNext);
   });
 
   $('#admin-form').addEventListener('submit', function (e) {
