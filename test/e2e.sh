@@ -27,7 +27,7 @@ code=$(curl -sk -o /dev/null -w '%{http_code}' "$BASE/api/streams")
 [ "$code" = 401 ] || fail "stream list must require admin, got $code"
 
 echo "--- RTSP authentication"
-rtsp() { curl -s -o /dev/null -w '%{response_code}' --rtsp-request DESCRIBE "$@" || true; }
+rtsp() { curl -s -o /dev/null -w '%{response_code}' -X DESCRIBE "$@" || true; }
 code=$(rtsp rtsp://localhost:8554/cam1);                           [ "$code" = 401 ] || fail "RTSP without credentials: $code"
 code=$(rtsp -u cam1:wrongpass rtsp://localhost:8554/cam1);         [ "$code" = 401 ] || fail "RTSP wrong password: $code"
 code=$(rtsp -u cam1:campass123 rtsp://localhost:8554/cam1);        [ "$code" = 404 ] || fail "RTSP valid credentials, no camera yet should be 404: $code"
