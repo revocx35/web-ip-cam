@@ -27,10 +27,12 @@ code=$(curl -sk -o /dev/null -w '%{http_code}' "$BASE/api/streams")
 [ "$code" = 401 ] || fail "stream list must require admin, got $code"
 
 echo "--- RTSP authentication"
-rtsp() { curl -s -o /dev/null -w '%{response_code}' -X DESCRIBE "$@" || true; }
-code=$(rtsp rtsp://localhost:8554/cam1);                           [ "$code" = 401 ] || fail "RTSP without credentials: $code"
-code=$(rtsp -u cam1:wrongpass rtsp://localhost:8554/cam1);         [ "$code" = 401 ] || fail "RTSP wrong password: $code"
-code=$(rtsp -u cam1:campass123 rtsp://localhost:8554/cam1);        [ "$code" = 404 ] || fail "RTSP valid credentials, no camera yet should be 404: $code"
+# ffprobe performs a real DESCRIBE; inspect its error for the RTSP status.
+rtsp() { ffprobe -v error -rtsp_transport tcp -timeout 5000000 "$1" 2>&1 || true; }
+rtsp rtsp://localhost:8554/cam1                 | grep -q 401 || fail "RTSP without credentials must be 401"
+rtsp rtsp://cam1:wrongpass@localhost:8554/cam1  | grep -q 401 || fail "RTSP with wrong password must be 401"
+rtsp rtsp://other:campass123@localhost:8554/cam1 | grep -q 401 || fail "RTSP with wrong username must be 401"
+rtsp rtsp://cam1:campass123@localhost:8554/cam1 | grep -q 404 || fail "RTSP valid credentials without camera must be 404"
 
 echo "--- browser camera -> WHIP -> RTSP"
 node e2e.js
