@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web IP Cam - Login</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="wrap narrow">
+    <header class="top"><div class="brand"><span class="dot"></span>Web IP Cam</div></header>
+    <div class="card">
+      <div class="tabs" role="tablist">
+        <button type="button" id="tab-stream" class="active" role="tab">Log in to stream</button>
+        <button type="button" id="tab-admin" role="tab">Admin</button>
+      </div>
+
+      <form id="stream-form" autocomplete="on">
+        <p class="sub mt">Turn this device into a camera for one of your streams.</p>
+        <label for="stream-name">Stream name</label>
+        <input id="stream-name" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+        <label for="stream-password">Stream password</label>
+        <input id="stream-password" type="password" autocomplete="current-password" required>
+        <button class="block" type="submit">Start camera</button>
+      </form>
+
+      <form id="admin-form" class="hidden" autocomplete="on">
+        <p class="sub mt">Manage streams and passwords.</p>
+        <label for="admin-username">Username</label>
+        <input id="admin-username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+        <label for="admin-password">Password</label>
+        <input id="admin-password" type="password" autocomplete="current-password" required>
+        <button class="block" type="submit">Log in as admin</button>
+      </form>
+
+      <div id="msg" class="msg"></div>
+    </div>
+  </div>
+  <script src="/static/common.js"></script>
+  <script src="/static/login.js"></script>
+</body>
+</html>

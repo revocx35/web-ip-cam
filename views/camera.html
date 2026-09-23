@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web IP Cam - Camera</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div class="brand"><span class="dot"></span><span>Camera: <span id="stream-name">...</span></span></div>
+      <div class="actions">
+        <button type="button" class="secondary small" id="btn-logout">Log out</button>
+      </div>
+    </header>
+
+    <div id="msg" class="msg"></div>
+
+    <div class="video-box">
+      <video id="preview" autoplay playsinline muted></video>
+      <div class="overlay">
+        <span id="conn-badge" class="badge off">idle</span>
+        <span id="viewer-badge" class="badge off hidden">0 viewers</span>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button type="button" id="btn-toggle">Start streaming</button>
+      <button type="button" class="secondary" id="btn-switch">Switch camera</button>
+      <button type="button" class="secondary" id="btn-blackout">Screen off</button>
+    </div>
+
+    <div class="card mt">
+      <h2>Settings</h2>
+      <div class="controls">
+        <div>
+          <label for="sel-camera">Camera</label>
+          <select id="sel-camera"><option value="">Default (back camera)</option></select>
+        </div>
+        <div>
+          <label for="sel-res">Resolution</label>
+          <select id="sel-res">
+            <option value="640x480">480p</option>
+            <option value="1280x720" selected>720p</option>
+            <option value="1920x1080">1080p</option>
+          </select>
+        </div>
+        <div>
+          <label for="sel-fps">Frame rate</label>
+          <select id="sel-fps">
+            <option value="10">10 fps</option>
+            <option value="15" selected>15 fps</option>
+            <option value="25">25 fps</option>
+            <option value="30">30 fps</option>
+          </select>
+        </div>
+        <div>
+          <label for="sel-bitrate">Max bitrate</label>
+          <select id="sel-bitrate">
+            <option value="500000">0.5 Mbit/s</option>
+            <option value="1000000">1 Mbit/s</option>
+            <option value="2000000" selected>2 Mbit/s</option>
+            <option value="4000000">4 Mbit/s</option>
+          </select>
+        </div>
+        <div>
+          <label for="sel-codec">Video codec</label>
+          <select id="sel-codec">
+            <option value="h264" selected>H.264 (most compatible)</option>
+            <option value="vp8">VP8</option>
+          </select>
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="chk-audio" checked> Stream microphone audio</label>
+      <label class="check"><input type="checkbox" id="chk-mirror"> Mirror preview</label>
+      <p class="sub mt">Keep this page open and in the foreground. Plug the device into a charger. "Screen off" blacks out the display while the camera keeps streaming - double-tap to wake.</p>
+    </div>
+  </div>
+
+  <div id="blackout">Streaming - double-tap to wake</div>
+
+  <script src="/static/common.js"></script>
+  <script src="/static/camera.js"></script>
+</body>
+</html>

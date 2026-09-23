@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web IP Cam - Setup</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="wrap narrow">
+    <header class="top"><div class="brand"><span class="dot"></span>Web IP Cam</div></header>
+    <div class="card">
+      <h1>Welcome</h1>
+      <p class="sub">Create the admin account. The admin creates streams and sets a password for each one.</p>
+      <form id="setup-form" autocomplete="on">
+        <label for="username">Admin username</label>
+        <input id="username" name="username" autocomplete="username" required maxlength="64" value="admin">
+        <label for="password">Password (min. 8 characters)</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" required minlength="8">
+        <label for="password2">Repeat password</label>
+        <input id="password2" type="password" autocomplete="new-password" required minlength="8">
+        <button class="block" type="submit">Create admin account</button>
+        <div id="msg" class="msg"></div>
+      </form>
+    </div>
+  </div>
+  <script src="/static/common.js"></script>
+  <script src="/static/setup.js"></script>
+</body>
+</html>

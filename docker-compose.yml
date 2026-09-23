@@ -1,0 +1,34 @@
+services:
+  app:
+    image: ghcr.io/revocx35/web-ip-cam:latest
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - mediamtx
+    ports:
+      - "8443:8443"   # web UI (HTTPS - required for camera access)
+      - "8080:8080"   # web UI (plain HTTP, e.g. behind a reverse proxy)
+    volumes:
+      - ./data:/data
+    environment:
+      RTSP_PUBLIC_PORT: "8554"
+      WEBRTC_PUBLIC_PORT: "8189"
+
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    restart: unless-stopped
+    ports:
+      - "8554:8554"          # RTSP
+      - "8000:8000/udp"      # RTSP over UDP (RTP)
+      - "8001:8001/udp"      # RTSP over UDP (RTCP)
+      - "8189:8189/udp"      # WebRTC media from the browser cameras
+      - "8189:8189/tcp"      # WebRTC media, TCP fallback
+    environment:
+      MTX_AUTHMETHOD: http
+      MTX_AUTHHTTPADDRESS: http://app:9000/mediamtx/auth
+      MTX_API: "yes"
+      MTX_WEBRTCLOCALUDPADDRESS: ":8189"
+      MTX_WEBRTCLOCALTCPADDRESS: ":8189"
+      MTX_RTMP: "no"
+      MTX_HLS: "no"
+      MTX_SRT: "no"

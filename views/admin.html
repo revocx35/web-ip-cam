@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web IP Cam - Admin</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div class="brand"><span class="dot"></span>Web IP Cam</div>
+      <div class="actions">
+        <button type="button" class="secondary small" id="btn-account">Change password</button>
+        <button type="button" class="secondary small" id="btn-logout">Log out</button>
+      </div>
+    </header>
+
+    <div id="mtx-warning" class="msg warn">The media server (MediaMTX) is not reachable - live status is unavailable and cameras cannot connect.</div>
+
+    <div class="card">
+      <h2>New stream</h2>
+      <form id="create-form" class="row" autocomplete="off">
+        <div class="grow">
+          <label for="new-name">Name (letters, digits, - and _)</label>
+          <input id="new-name" required maxlength="64" pattern="[A-Za-z0-9_\-]+" autocapitalize="none" spellcheck="false" placeholder="living-room">
+        </div>
+        <div class="grow">
+          <label for="new-password">Password (min. 4 characters)</label>
+          <input id="new-password" required minlength="4" maxlength="128" autocomplete="new-password">
+        </div>
+        <button type="submit">Create</button>
+      </form>
+      <div id="create-msg" class="msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Streams</h2>
+      <div id="streams" class="streams"><div class="empty">Loading...</div></div>
+    </div>
+
+    <div class="card">
+      <h2>How to use</h2>
+      <p class="sub">
+        1. On the old phone/tablet/laptop, open this site over HTTPS and choose <b>Log in to stream</b>.<br>
+        2. Enter the stream's name and password and allow camera and microphone access.<br>
+        3. Add the RTSP URL shown above to your NVR, Home Assistant, VLC, etc. The RTSP username is the stream name
+        and the password is the stream password.
+      </p>
+    </div>
+  </div>
+
+  <div class="dialog-backdrop" id="pw-dialog">
+    <div class="card dialog">
+      <h2 id="pw-title">Change password</h2>
+      <form id="pw-form" autocomplete="off">
+        <div id="pw-current-wrap">
+          <label for="pw-current">Current password</label>
+          <input id="pw-current" type="password" autocomplete="current-password">
+        </div>
+        <label for="pw-new">New password</label>
+        <input id="pw-new" required autocomplete="new-password">
+        <div class="buttons">
+          <button type="submit">Save</button>
+          <button type="button" class="secondary" id="pw-cancel">Cancel</button>
+        </div>
+        <div id="pw-msg" class="msg"></div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/common.js"></script>
+  <script src="/static/admin.js"></script>
+</body>
+</html>
