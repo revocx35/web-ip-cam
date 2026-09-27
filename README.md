@@ -284,6 +284,8 @@ Requirements and limitations:
 
 ## Development
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for how it works inside (flows, sessions, login limits, reverse-proxy rules) and [CLAUDE.md](CLAUDE.md) for contributor notes.
+
 ```bash
 docker compose up -d --build
 # end-to-end test (needs node, ffprobe and playwright):
