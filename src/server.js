@@ -41,7 +41,11 @@ const config = {
 
 const store = new Store(config.dataDir);
 const mtx = new MediaMTX({ apiUrl: config.mtxApi, webrtcUrl: config.mtxWebrtc, secret: store.secret });
+// Failed logins per client IP, and per account from all IPs together (bounds distributed guessing).
 const limiter = new sec.RateLimiter({ max: 10, windowMs: 15 * 60 * 1000 });
+const accountLimiter = new sec.RateLimiter({ max: 50, windowMs: 15 * 60 * 1000 });
+// Checked when the account doesn't exist, so a wrong name takes as long as a wrong password.
+const DUMMY_HASH = sec.hashPassword(crypto.randomBytes(16).toString('hex'));
 
 const COOKIE = 'wic_session';
 const ADMIN_TTL = 7 * 24 * 3600 * 1000;
@@ -117,12 +121,22 @@ function requireStream(req, res, next) {
 // Public web app
 // ---------------------------------------------------------------------------
 
+// Which peers may set X-Forwarded-For/-Proto. `true` means reverse proxies on loopback or private
+// networks (e.g. Nginx Proxy Manager on the same host or LAN): Express's own `true` would trust
+// every hop and take the left-most X-Forwarded-For entry, which the client controls, so anyone could
+// pick a new IP per request and skip the login limiter. A number trusts that many hops; anything
+// else is a list of addresses/subnets.
+function trustProxySetting(value) {
+  const v = (value || '').trim();
+  if (!v || /^(0|false|no|off)$/i.test(v)) return false;
+  if (/^(true|yes|on)$/i.test(v)) return 'loopback, linklocal, uniquelocal';
+  if (/^\d+$/.test(v)) return parseInt(v, 10);
+  return v;
+}
+
 const app = express();
 app.disable('x-powered-by');
-if (config.trustProxy) {
-  const tp = config.trustProxy;
-  app.set('trust proxy', /^\d+$/.test(tp) ? parseInt(tp, 10) : bool(tp, false) || tp);
-}
+app.set('trust proxy', trustProxySetting(config.trustProxy));
 
 const frameAncestors = config.embedOrigins.length ? `'self' ${config.embedOrigins.join(' ')}` : "'none'";
 
@@ -197,28 +211,35 @@ api.post('/setup', (req, res) => {
 
 api.post('/login/admin', (req, res) => {
   const key = `admin:${req.ip}`;
-  if (limiter.blocked(key)) return res.status(429).json({ error: 'Too many attempts, try again later' });
+  if (limiter.blocked(key) || accountLimiter.blocked('admin')) return res.status(429).json({ error: 'Too many attempts, try again later' });
   const admin = store.getAdmin();
   const { username, password } = req.body || {};
-  if (!admin || typeof username !== 'string' || username.trim() !== admin.username || !sec.verifyPassword(password, admin.hash)) {
+  const passwordOk = sec.verifyPassword(password, admin ? admin.hash : DUMMY_HASH);
+  if (!admin || typeof username !== 'string' || username.trim() !== admin.username || !passwordOk) {
     limiter.fail(key);
+    accountLimiter.fail('admin');
     return res.status(401).json({ error: 'Wrong username or password' });
   }
   limiter.reset(key);
+  accountLimiter.reset('admin');
   setSession(req, res, { t: 'admin', v: sec.hashVersion(admin.hash) }, ADMIN_TTL);
   res.json({ ok: true });
 });
 
 api.post('/login/stream', (req, res) => {
   const key = `stream:${req.ip}`;
-  if (limiter.blocked(key)) return res.status(429).json({ error: 'Too many attempts, try again later' });
   const { name, password } = req.body || {};
+  const account = `stream:${String(name).trim().slice(0, 64)}`;
+  if (limiter.blocked(key) || accountLimiter.blocked(account)) return res.status(429).json({ error: 'Too many attempts, try again later' });
   const stream = typeof name === 'string' ? store.getStream(name.trim()) : null;
-  if (!stream || !sec.verifyPassword(password, stream.hash)) {
+  const passwordOk = sec.verifyPassword(password, stream ? stream.hash : DUMMY_HASH);
+  if (!stream || !passwordOk) {
     limiter.fail(key);
+    accountLimiter.fail(account);
     return res.status(401).json({ error: 'Wrong stream name or password' });
   }
   limiter.reset(key);
+  accountLimiter.reset(account);
   setSession(req, res, { t: 'stream', n: stream.name, v: sec.hashVersion(stream.hash) }, STREAM_TTL);
   res.json({ ok: true });
 });
@@ -231,10 +252,18 @@ api.post('/logout', (req, res) => {
 api.put('/admin/password', requireAdmin, (req, res) => {
   const admin = store.getAdmin();
   const { current, password } = req.body || {};
-  if (!sec.verifyPassword(current, admin.hash)) return res.status(403).json({ error: 'Current password is wrong' });
   if (typeof password !== 'string' || password.length < 8 || password.length > 256) {
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
+  const key = `admin:${req.ip}`;
+  if (limiter.blocked(key) || accountLimiter.blocked('admin')) return res.status(429).json({ error: 'Too many attempts, try again later' });
+  if (!sec.verifyPassword(current, admin.hash)) {
+    limiter.fail(key);
+    accountLimiter.fail('admin');
+    return res.status(403).json({ error: 'Current password is wrong' });
+  }
+  limiter.reset(key);
+  accountLimiter.reset('admin');
   const hash = sec.hashPassword(password);
   store.setAdmin({ ...admin, hash });
   setSession(req, res, { t: 'admin', v: sec.hashVersion(hash) }, ADMIN_TTL);
@@ -242,7 +271,7 @@ api.put('/admin/password', requireAdmin, (req, res) => {
 });
 
 function validStreamPassword(p) {
-  return typeof p === 'string' && p.length >= 4 && p.length <= 128;
+  return typeof p === 'string' && p.length >= 8 && p.length <= 128;
 }
 
 api.get('/streams', requireAdmin, async (req, res) => {
@@ -273,7 +302,7 @@ api.post('/streams', requireAdmin, (req, res) => {
   if (typeof name !== 'string' || !STREAM_NAME_RE.test(name) || name === APP_USER) {
     return res.status(400).json({ error: 'Name may only contain letters, digits, "-" and "_" (max 64)' });
   }
-  if (!validStreamPassword(password)) return res.status(400).json({ error: 'Password must be 4-128 characters' });
+  if (!validStreamPassword(password)) return res.status(400).json({ error: 'Password must be 8-128 characters' });
   if (store.getStream(name)) return res.status(409).json({ error: 'A stream with this name already exists' });
   store.putStream(name, { hash: sec.hashPassword(password), createdAt: new Date().toISOString() });
   const rtsp = rtspInfo(req, name);
@@ -284,7 +313,7 @@ api.put('/streams/:name/password', requireAdmin, async (req, res) => {
   const stream = store.getStream(req.params.name);
   if (!stream) return res.status(404).json({ error: 'No such stream' });
   const { password } = req.body || {};
-  if (!validStreamPassword(password)) return res.status(400).json({ error: 'Password must be 4-128 characters' });
+  if (!validStreamPassword(password)) return res.status(400).json({ error: 'Password must be 8-128 characters' });
   store.putStream(stream.name, { hash: sec.hashPassword(password) });
   verifyCache.clear();
   await mtx.kickPublisher(stream.name);

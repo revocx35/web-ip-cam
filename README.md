@@ -78,7 +78,7 @@ docker compose up -d --build
 
 ### Admin
 
-- **Create streams:** each stream needs a name (letters, digits, `-`, `_`) and a password. The password is shown once, inside the full RTSP URL, when you create the stream. Passwords are stored as hashes.
+- **Create streams:** each stream needs a name (letters, digits, `-`, `_`) and a password of at least 8 characters. The password is shown once, inside the full RTSP URL, when you create the stream. Passwords are stored as hashes.
 - **Monitor streams:** the dashboard shows which streams are live, how long they've been up, how many viewers they have, and their codecs.
 - **Change a stream's password:** this disconnects the camera, which must then log in again.
 - **Delete a stream:** this disconnects the camera and its viewers.
@@ -138,7 +138,7 @@ Environment variables for the `app` service:
 | `HTTP_PORT` | `8080` | Plain HTTP port. Camera access only works over HTTPS, so use this port only behind a TLS reverse proxy. |
 | `HTTPS_ENABLED` | `true` | Set to `false` to serve only HTTP (for example, when a reverse proxy handles TLS). |
 | `TLS_CERT_FILE` / `TLS_KEY_FILE` | *(empty)* | Paths to your own certificate and key (mount them into the container). If not set, the app uses a self-signed certificate. |
-| `TRUST_PROXY` | *(empty)* | Set to `true` (or a hop count or subnet) when running behind a reverse proxy, so that client IPs and hostnames are detected correctly. |
+| `TRUST_PROXY` | *(empty)* | Set when running behind a reverse proxy, so that client IPs (used to limit login attempts), HTTPS and hostnames are detected correctly. `true` trusts proxies on loopback and private networks (Nginx Proxy Manager on the same host or LAN). You can also give addresses/subnets (`172.18.0.0/16`) or a number of proxy hops (see below). |
 | `RTSP_PUBLIC_HOST` | *(the host you browse with)* | Hostname or IP shown in the RTSP URLs on the admin page. |
 | `RTSP_PUBLIC_PORT` | `8554` | RTSP port shown in the RTSP URLs. |
 | `WEBRTC_PUBLIC_PORT` | `8189` | Public port of MediaMTX's WebRTC listener. It must match the port mapping of the `mediamtx` service. |
@@ -166,6 +166,8 @@ For the `mediamtx` service, you can use any [MediaMTX setting](https://github.co
 ### Behind Nginx Proxy Manager (or another reverse proxy)
 
 The proxy only handles the **web UI**. The camera video (WebRTC) goes directly from the browser to port **8189 UDP/TCP**. RTSP goes directly to port **8554**, because RTSP isn't HTTP.
+
+**Before you start:** open the app on your LAN once and create the admin account. Until it exists, whoever opens the site first can create it.
 
 **1. Compose file.** Turn off the app's own HTTPS and trust the proxy's forwarded headers. If Nginx Proxy Manager runs in Docker on the same host, attach the app to its network so port 8080 doesn't have to be published:
 
@@ -212,7 +214,9 @@ networks:
     name: nginxproxymanager_default   # check the real name with: docker network ls
 ```
 
-If Nginx Proxy Manager runs on another machine (or you don't want to share a network), leave out the `networks:` parts and publish `"8080:8080"` on `app` instead.
+If Nginx Proxy Manager runs on another machine (or you don't want to share a network), leave out the `networks:` parts and publish `"8080:8080"` on `app` instead. Don't forward port 8080 on your router: only the proxy should reach it.
+
+`TRUST_PROXY: "true"` accepts `X-Forwarded-For` only from proxies with a private address, and uses the right-most entry that isn't one, so a client can't fake its IP to get around the login limit. If another proxy sits in front of Nginx Proxy Manager (for example Cloudflare), set `TRUST_PROXY` to the number of proxies (`"2"`) instead, but only if port 8080 can't be reached except through them.
 
 **2. Proxy host in Nginx Proxy Manager.** Go to *Hosts → Proxy Hosts → Add Proxy Host*:
 
@@ -232,7 +236,9 @@ You don't need any custom Nginx config.
 - **Cameras on your LAN:** set `WEBRTC_ADDITIONAL_HOSTS` to the server's LAN IP (as above). Then LAN cameras connect directly, even though the domain resolves to your public IP.
 - **Cameras outside your LAN (for example a phone on 4G):** forward **8189 UDP and TCP** on your router to the server. The app automatically advertises the IP your domain resolves to. If that isn't your real public IP (for example with the Cloudflare proxy / orange cloud), add your public IP or a DDNS hostname to `WEBRTC_ADDITIONAL_HOSTS`, separated by commas: `"192.168.1.10,myhome.duckdns.org"`.
 
-**4. RTSP.** NVRs on the LAN use `rtsp://…@<server LAN IP>:8554/<name>` directly. Only forward 8554 on your router if you need RTSP from outside, and prefer a VPN for that.
+**4. RTSP.** NVRs on the LAN use `rtsp://…@<server LAN IP>:8554/<name>` directly. Only forward 8554 on your router if you need RTSP from outside, and prefer a VPN for that: RTSP logins don't go through the web login limit.
+
+**Login protection.** The web logins allow 10 failed attempts per client IP and 50 per account (admin, or one stream) from all IPs together, per 15 minutes. After that the API answers `429` until the window ends.
 
 ### Home Assistant dashboard (wall tablet / kiosk)
 

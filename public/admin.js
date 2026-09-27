@@ -120,7 +120,7 @@
     $('#pw-current-wrap').classList.toggle('hidden', !!streamName);
     $('#pw-current').required = !streamName;
     $('#pw-new').type = streamName ? 'text' : 'password';
-    $('#pw-new').minLength = streamName ? 4 : 8;
+    $('#pw-new').minLength = 8;
     $('#pw-current').value = '';
     $('#pw-new').value = '';
     WIC.hideMsg(pwMsg);
