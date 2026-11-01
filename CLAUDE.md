@@ -22,7 +22,7 @@ node --check src/server.js
 DATA_DIR=/tmp/wic HTTPS_ENABLED=false HTTP_PORT=18090 INTERNAL_PORT=18091 node src/server.js   # no MediaMTX: UI/API work, streams show offline
 ```
 
-`node --test test/` (after `npm ci`) runs `test/server.test.js`: the app as a child process without MediaMTX (plus a tiny fake WHIP endpoint) for cookies, stream names, WHIP failures and cache headers. CI runs it and also `test/e2e.sh` against a real `docker compose up` (setup, streams, RTSP auth via ffprobe, a headless Chromium publishing a fake camera).
+`node --test test/server.test.js` (after `npm ci`) runs `test/server.test.js`: the app as a child process without MediaMTX (plus a tiny fake WHIP endpoint) for cookies, stream names, WHIP failures and cache headers. CI runs it and also `test/e2e.sh` against a real `docker compose up` (setup, streams, RTSP auth via ffprobe, a headless Chromium publishing a fake camera).
 
 ## Layout
 

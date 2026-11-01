@@ -21,7 +21,7 @@ jobs:
           node-version: 22
 
       - name: Unit tests
-        run: npm ci --no-audit --no-fund && node --test test/
+        run: npm ci --no-audit --no-fund && node --test test/server.test.js
 
       - name: Install test tools
         working-directory: test

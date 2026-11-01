@@ -1,5 +1,5 @@
 'use strict';
-// Unit-level tests against a real app process without MediaMTX: node --test test/
+// Unit-level tests against a real app process without MediaMTX: node --test test/server.test.js
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const { spawn } = require('child_process');

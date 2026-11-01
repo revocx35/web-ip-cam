@@ -9,7 +9,7 @@ Notes for AI agents. Full guide: [CLAUDE.md](CLAUDE.md); flows, auth and threat 
 - `test/server.test.js` (unit, `node --test`), `test/e2e.sh` + `e2e.js` (full stack).
 
 ## Commands
-- `npm ci && node --test test/` — fast tests, no Docker needed.
+- `npm ci && node --test test/server.test.js` — fast tests, no Docker needed.
 - `node --check src/server.js`
 - `docker compose up -d --build` then `test/e2e.sh` — end-to-end (needs ffprobe, playwright). Tear the stack down afterwards.
 
