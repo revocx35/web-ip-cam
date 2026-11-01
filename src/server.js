@@ -66,7 +66,12 @@ function parseCookies(header) {
   for (const part of (header || '').split(';')) {
     const i = part.indexOf('=');
     if (i < 0) continue;
-    out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    const value = part.slice(i + 1).trim();
+    try {
+      out[part.slice(0, i).trim()] = decodeURIComponent(value);
+    } catch {
+      // A malformed cookie set by another app on the same host must not break every request.
+    }
   }
   return out;
 }
