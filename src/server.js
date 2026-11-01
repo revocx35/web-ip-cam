@@ -304,7 +304,9 @@ api.get('/streams', requireAdmin, async (req, res) => {
 
 api.post('/streams', requireAdmin, (req, res) => {
   const { name, password } = req.body || {};
-  if (typeof name !== 'string' || !STREAM_NAME_RE.test(name) || name === APP_USER) {
+  // "__proto__" matches the pattern, but assigning it to the streams object changes its prototype
+  // instead of adding a stream: the API answered 201 with credentials for a stream that didn't exist.
+  if (typeof name !== 'string' || !STREAM_NAME_RE.test(name) || name === APP_USER || name === '__proto__') {
     return res.status(400).json({ error: 'Name may only contain letters, digits, "-" and "_" (max 64)' });
   }
   if (!validStreamPassword(password)) return res.status(400).json({ error: 'Password must be 8-128 characters' });
