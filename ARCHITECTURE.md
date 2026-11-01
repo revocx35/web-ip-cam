@@ -47,6 +47,7 @@ public/
   camera.js      getUserMedia, WHIP publish, reconnect with backoff, settings, wake lock, ?embed=1
   app.css
 test/
+  server.test.js node --test: app process without MediaMTX (cookies, names, WHIP errors, headers)
   e2e.sh         end-to-end test against a running `docker compose up` stack (curl + ffprobe)
   e2e.js         headless Chromium with a fake camera publishes; ffprobe checks the RTSP output
 .github/workflows/ci.yml   e2e on every push/PR, then multi-arch image to GHCR
@@ -148,6 +149,7 @@ Express's own `true` trusts every hop and returns the *left-most* entry, which l
 
 - The API only parses `application/json` bodies (`application/sdp` for WHIP). Other origins can't send those without a CORS preflight, and the app never answers one. Together with the `SameSite` cookie this blocks CSRF without tokens.
 - CSP: `default-src 'self'`, no inline scripts or styles, `base-uri 'none'`, `form-action 'self'`, `frame-ancestors 'none'` (or `'self'` + `ALLOW_EMBED_FROM` origins, which are validated at startup). `X-Frame-Options: DENY` when embedding is off. `Referrer-Policy: no-referrer`. `Permissions-Policy` allows camera, microphone and wake lock for the app's own origin only.
+- Every `/api` answer has `Cache-Control: no-store` (stream creation and password changes return the RTSP URL with the password). Malformed cookies are ignored, not an error. The stream name `__proto__` is refused (it would replace the store object's prototype).
 - `login.js` follows `?next=` only to `/camera` paths (no open redirect).
 
 ### MediaMTX

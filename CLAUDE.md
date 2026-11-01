@@ -6,7 +6,7 @@ Guide for AI assistants (and humans) working on this repository.
 
 **Web IP Cam** turns old phones, tablets and laptops into RTSP IP cameras from the browser, with no app install. A device logs in to a stream, its browser publishes the camera over WebRTC (WHIP) through the Node.js app to MediaMTX, and NVRs/players read it as `rtsp://<stream>:<password>@<server>:8554/<stream>`. The deliverable is a Docker Compose stack of two containers: `app` (this repo) and `mediamtx`.
 
-Read [ARCHITECTURE.md](ARCHITECTURE.md) before changing auth, WHIP or networking code. It has the flows, the session and login-limit model, and the reverse-proxy rules.
+Read [AGENTS.md](AGENTS.md) and [ARCHITECTURE.md](ARCHITECTURE.md) (required). Read ARCHITECTURE.md especially before changing auth, WHIP or networking code. It has the flows, the session and login-limit model, and the reverse-proxy rules.
 
 ## Commands
 
@@ -22,7 +22,7 @@ node --check src/server.js
 DATA_DIR=/tmp/wic HTTPS_ENABLED=false HTTP_PORT=18090 INTERNAL_PORT=18091 node src/server.js   # no MediaMTX: UI/API work, streams show offline
 ```
 
-There are no unit tests; CI runs `test/e2e.sh` against a real `docker compose up` (setup, streams, RTSP auth via ffprobe, a headless Chromium publishing a fake camera).
+`node --test test/` (after `npm ci`) runs `test/server.test.js`: the app as a child process without MediaMTX (plus a tiny fake WHIP endpoint) for cookies, stream names, WHIP failures and cache headers. CI runs it and also `test/e2e.sh` against a real `docker compose up` (setup, streams, RTSP auth via ffprobe, a headless Chromium publishing a fake camera).
 
 ## Layout
 
@@ -31,7 +31,7 @@ There are no unit tests; CI runs `test/e2e.sh` against a real `docker compose up
 - `src/db.js`: `Store`, the JSON file `data/db.json` (app secret, admin, streams).
 - `src/mediamtx.js`: MediaMTX API/WHIP client, `resolveHostIPs` + `injectCandidates` for ICE.
 - `views/*.html` + `public/*.js`: the four pages (setup, login, admin, camera) and their scripts; `public/common.js` holds the shared `WIC` helpers.
-- `test/`: `e2e.sh` + `e2e.js`. `.github/workflows/ci.yml`: e2e, then image publish.
+- `test/`: `server.test.js` (node --test), `e2e.sh` + `e2e.js`. `.github/workflows/ci.yml`: e2e, then image publish.
 
 ## Conventions
 
@@ -45,6 +45,8 @@ There are no unit tests; CI runs `test/e2e.sh` against a real `docker compose up
   - Use `req.ip`/`req.secure` for client address and HTTPS, never raw `X-Forwarded-*` headers. Never set Express `trust proxy` to `true` (see below).
 - Session payloads carry `v = hashVersion(<password hash>)`, so storing a new hash logs out that account's old sessions by itself. For streams, also call `verifyCache.clear()` (RTSP) and `mtx.kickPublisher()` (the running camera).
 - Nothing on port 9000 may be published: the internal auth endpoint accepts the app secret and tests stream passwords without limits.
+- Express 4 doesn't catch rejected promises: in an `async` handler, every `await` that can reject must be in try/catch, or the unhandled rejection ends the process.
+- API answers carry `Cache-Control: no-store` (they include RTSP passwords). Don't add HSTS: the default certificate is self-signed and HSTS would remove the browser's "continue anyway".
 - When you change env vars, endpoints or behaviour, update `README.md` (configuration table, reverse-proxy section) and `ARCHITECTURE.md`.
 
 ## Hard-won facts (don't re-learn these)
