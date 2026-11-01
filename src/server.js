@@ -355,14 +355,17 @@ api.post('/whip', requireStream, express.text({ type: 'application/sdp', limit: 
     return res.status(400).json({ error: 'Expected an SDP offer' });
   }
   const name = req.session.name;
+  // Express 4 doesn't catch rejected promises: an error escaping this handler would be an unhandled
+  // rejection, which ends the Node process (and every camera with it).
   let upstream;
+  let body;
   try {
     upstream = await mtx.whipPost(name, req.body);
+    body = await upstream.text();
   } catch (err) {
     console.error('WHIP upstream error:', err.message);
     return res.status(502).json({ error: 'Media server unreachable' });
   }
-  const body = await upstream.text();
   if (upstream.status !== 201) {
     console.error(`WHIP upstream returned ${upstream.status}: ${body.slice(0, 200)}`);
     return res.status(502).json({ error: `Media server rejected the stream (${upstream.status})` });
@@ -379,8 +382,12 @@ api.post('/whip', requireStream, express.text({ type: 'application/sdp', limit: 
   const location = upstream.headers.get('location');
   if (location) {
     pruneWhipSessions();
-    const loc = new URL(location, config.mtxWebrtc + '/');
-    whipSessions.set(id, { name, location: loc.pathname + loc.search, created: Date.now() });
+    try {
+      const loc = new URL(location, config.mtxWebrtc + '/');
+      whipSessions.set(id, { name, location: loc.pathname + loc.search, created: Date.now() });
+    } catch {
+      console.error('WHIP upstream sent an invalid Location header');
+    }
   }
   res.status(201).set({ 'Content-Type': 'application/sdp', Location: `/api/whip/${id}` }).send(answer);
 });
