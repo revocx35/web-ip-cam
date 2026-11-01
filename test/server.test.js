@@ -78,3 +78,11 @@ test('a WHIP answer cut off by MediaMTX gives 502 and does not crash the app', a
   assert.strictEqual(proc.exitCode, null, 'app process exited');
   assert.strictEqual((await fetch(BASE + '/api/state')).status, 200);
 });
+
+test('API answers are not cached (they contain RTSP passwords)', async () => {
+  const cookie = await adminCookie();
+  const res = await fetch(BASE + '/api/streams', json('POST', { name: 'cam2', password: 'abcdefgh1' }, cookie));
+  assert.strictEqual(res.status, 201);
+  assert.match((await res.json()).rtspUrlWithCredentials, /abcdefgh1/);
+  assert.strictEqual(res.headers.get('cache-control'), 'no-store');
+});

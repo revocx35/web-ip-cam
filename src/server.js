@@ -183,6 +183,8 @@ app.get('/camera', (req, res, next) => {
 });
 
 const api = express.Router();
+// API answers carry sessions and RTSP URLs with passwords: keep them out of browser and proxy caches.
+api.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 api.use(express.json({ limit: '16kb' }));
 
 function rtspInfo(req, name) {
